@@ -2,6 +2,7 @@
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
 #include <TinyPICO.h>
+#include <ESP32Servo.h>
 
 #include "ESPAsyncWebServer.h"
 
@@ -11,7 +12,10 @@
 
 // Config
 const int zoneCount = 3;
-const int zonePins[zoneCount] = {0, 1, 2};
+int zonePins[zoneCount] = {25, 26, 27};
+Servo servos[zoneCount];
+const int servoOffAngle = 0;
+const int servoOnAngle = 180;
 
 // zoneState 0 is unused
 int zoneStates[zoneCount + 1];
@@ -23,12 +27,31 @@ void setZoneState(int zone, int value)
 {
   zoneStates[zone] = value;
 
-  // TODO: Servo Stuff™
+  servos[zone - 1].write(value ? servoOffAngle : servoOnAngle);
+  delay(1000);
 
   Serial.print("Zone ");
   Serial.print(zone);
   Serial.print(" is now ");
   Serial.println(value ? "on" : "off");
+}
+
+void initializeServos()
+{
+  // Allow allocation of all timers
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+
+  for (int i = 0; i < zoneCount; i++)
+  {
+    servos[i].setPeriodHertz(50); // standard 50 hz servo
+    // using SG90 servo min/max of 500us and 2400us
+    // for MG995 large servo, use 1000us and 2000us,
+    // which are the defaults.
+    servos[i].attach(zonePins[i], 500, 2400);
+  }
 }
 
 void setup()
@@ -58,6 +81,8 @@ void setup()
   {
     setZoneState(i, 0);
   }
+
+  initializeServos();
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request)
             {
