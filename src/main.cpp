@@ -14,11 +14,10 @@
 const int zoneCount = 3;
 int zonePins[zoneCount] = {25, 26, 27};
 Servo servos[zoneCount];
-const int servoOffAngle = 0;
-const int servoOnAngle = 180;
+const int servoOffAngle = 90;
+const int servoOnAngle = 0;
 
-// zoneState 0 is unused
-int zoneStates[zoneCount + 1];
+int zoneStates[zoneCount];
 
 AsyncWebServer server(80);
 TinyPICO tp = TinyPICO();
@@ -27,11 +26,11 @@ void setZoneState(int zone, int value)
 {
   zoneStates[zone] = value;
 
-  servos[zone - 1].write(value ? servoOffAngle : servoOnAngle);
-  delay(1000);
+  servos[zone].write(value == 1 ? servoOnAngle : servoOffAngle);
+  delay(900);
 
   Serial.print("Zone ");
-  Serial.print(zone);
+  Serial.print(zone + 1);
   Serial.print(" is now ");
   Serial.println(value ? "on" : "off");
 }
@@ -50,7 +49,7 @@ void initializeServos()
     // using SG90 servo min/max of 500us and 2400us
     // for MG995 large servo, use 1000us and 2000us,
     // which are the defaults.
-    servos[i].attach(zonePins[i], 500, 2400);
+    servos[i].attach(zonePins[i], 500, 2500);
   }
 }
 
@@ -76,13 +75,13 @@ void setup()
   }
   mdns_hostname_set(DNS_NAME);
 
+  initializeServos();
+
   // Initialize zones
-  for (int i = 1; i <= zoneCount; i++)
+  for (int i = 0; i < zoneCount; i++)
   {
     setZoneState(i, 0);
   }
-
-  initializeServos();
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request)
             {
@@ -90,10 +89,10 @@ void setup()
 
               DynamicJsonDocument doc(capacity);
 
-              for (int i = 1; i <= zoneCount; i++)
+              for (int i = 0; i < zoneCount; i++)
               {
                 JsonObject list = doc.createNestedObject();
-                list["zone"] = i;
+                list["zone"] = i + 1;
                 list["state"] = zoneStates[i];
               }
 
@@ -107,7 +106,7 @@ void setup()
               int zone = request->arg("zone").toInt();
               int value = request->arg("value").toInt();
 
-              setZoneState(zone, value);
+              setZoneState(zone - 1, value);
               request->send(200);
             });
 
